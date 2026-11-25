@@ -8,7 +8,7 @@ Melaporkan:
   FORBIDDEN    path berbau tarif/pembayaran/rute/GPS (di luar scope MVP)
   UNPROTECTED  endpoint non-publik tanpa autentikasi (kemungkinan lupa Depends guard)
 
-Exit code 1 jika ada MISSING (kecuali --allow-missing), FORBIDDEN, atau UNPROTECTED.
+Exit code 1 nnnn jika ada MISSING (kecuali --allow-missing), FORBIDDEN, atau UNPROTECTED.
 """
 import re
 import sys

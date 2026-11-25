@@ -3,29 +3,36 @@
 Backend FastAPI + PostgreSQL untuk proyek Prokom Anterin Dong.
 Semua endpoint ada di bawah `/api/v1`, dokumentasi Swagger di `/docs`.
 
-## Jalan lokal (Docker)
+## Jalan lokal
 
-```bash
-cp .env.example .env        # lalu isi JWT_SECRET dengan string acak panjang
-docker compose up --build
+Siapkan Python 3.11+, PostgreSQL, dan database `anterin_dong` secara lokal. Buat
+virtual environment, pasang dependency, lalu salin `.env.example` menjadi `.env`.
+Atur `DATABASE_URL` sesuai kredensial PostgreSQL lokal dan isi `JWT_SECRET` dengan
+string acak panjang.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements-dev.txt
+Copy-Item .env.example .env
+python -m uvicorn app.main:app --reload
 ```
 
 - Swagger: http://localhost:8000/docs
 - Health check: http://localhost:8000/api/v1/health (`database: "up"` artinya terhubung)
 
-Migrasi database:
+Jalankan migrasi dari virtual environment yang sama:
 
 ```bash
-docker compose exec api alembic revision --autogenerate -m "pesan singkat"
-docker compose exec api alembic upgrade head
+python -m alembic revision --autogenerate -m "pesan singkat"
+python -m alembic upgrade head
 ```
 
 Tes dan lint:
 
 ```bash
-docker compose exec api pip install -r requirements-dev.txt
-docker compose exec api pytest -q
-docker compose exec api ruff check .
+python -m pytest -q
+python -m ruff check .
 ```
 
 Tes memakai SQLite in-memory (lihat `tests/conftest.py`: fixture `client`, `db_session`, `make_user`),
