@@ -47,7 +47,7 @@ EXPECTED = {
     ("DELETE", "/admin/locations/{id}"),
 }
 PUBLIC = {("POST", "/auth/login"), ("GET", "/health")}
-IGNORED = {("GET", "/admin/ping")}  # contoh role guard, dihapus nanti
+IGNORED = {("GET", "/admin/ping"), ("GET", "/health")}  # endpoint infrastruktur / contoh
 FORBIDDEN = re.compile(
     r"tarif|tariff|fare|price|pay|wallet|qris|voucher|promo|route|routing|distance|"
     r"navigat|gps|track|estimat|rating|escrow",
