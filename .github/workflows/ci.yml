@@ -8,14 +8,35 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: anterin
+          POSTGRES_PASSWORD: anterin
+          POSTGRES_DB: anterin_dong
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U anterin -d anterin_dong"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
+      APP_ENV: development
       JWT_SECRET: ci-test-secret-ci-test-secret-1234
+      DATABASE_URL: postgresql+psycopg2://anterin:anterin@localhost:5432/anterin_dong
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
+          cache-dependency-path: requirements*.txt
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
+      # Migration harus bisa dijalankan dari database kosong sampai head.
+      - run: alembic upgrade head
+      # Gagal jika model diubah tetapi lupa membuat migration (model != migration).
+      - run: alembic check
       - run: pytest -q

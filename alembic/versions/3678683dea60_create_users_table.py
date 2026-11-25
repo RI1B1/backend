@@ -1,7 +1,7 @@
 """create users table
 
 Revision ID: 3678683dea60
-Revises: 
+Revises:
 Create Date: 2026-11-25 02:30:52.626293
 """
 from typing import Sequence, Union

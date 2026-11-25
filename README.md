@@ -28,6 +28,10 @@ docker compose exec api pytest -q
 docker compose exec api ruff check .
 ```
 
+Tes memakai SQLite in-memory (lihat `tests/conftest.py`: fixture `client`, `db_session`, `make_user`),
+jadi tidak butuh Postgres. CI tambahan menjalankan `alembic upgrade head` dan `alembic check` ke Postgres.
+Selalu jalankan `alembic check` sebelum PR yang mengubah model: jika gagal, buat migration.
+
 ## Struktur
 
 ```
@@ -38,7 +42,8 @@ app/
     config.py        setting dari .env
     response.py      format respons standar (ok, paginated, fail)
     errors.py        ErrorCode, exception, handler global
-    security.py      Role, JWT, get_current_user, require_role
+    security.py      Role, JWT, get_current_user, require_role, require_approved_driver
+    constants.py     OrderStatus, DriverApplicationStatus, aturan transisi status
     pagination.py    PageParams (?page=&limit=)
   db/
     base.py          Base + TimestampMixin
@@ -62,8 +67,12 @@ Modul: `auth`, `users`, `services`, `orders`, `drivers`, `locations`, `chat`, `a
    raise NotFoundError(ErrorCode.ORDER_NOT_FOUND, "Pesanan tidak ditemukan.")
    ```
    Butuh error code baru? Tambah di `ErrorCode` lewat PR.
-4. **Role guard:** `user: CurrentUser = Depends(require_role(Role.DRIVER))`.
-   Cek kepemilikan data (misal order milik Customer itu) di service.
+4. **Auth guard** (semua memeriksa ke database, role di token diabaikan):
+   - `user: CurrentUser = Depends(get_current_user)` : login valid, user ada dan `is_active`.
+   - `Depends(require_role(Role.ADMIN))` : role di DB harus sesuai. Customer boleh juga Driver: `require_role(Role.CUSTOMER, Role.DRIVER)`.
+   - `Depends(require_approved_driver)` : wajib untuk menerima pesanan; cek `driver_applications.status == APPROVED`.
+   - Cek kepemilikan data (misal order milik Customer itu) dilakukan di service, error `ORDER_ACCESS_DENIED`.
+   - Gunakan enum di `app/core/constants.py` (`OrderStatus`, `DriverApplicationStatus`, `can_transition`), jangan menulis string status langsung.
 5. **Daftar** memakai `params: PageParams = Depends()` dan `paginated(items, page, limit, total)`.
 6. **Model baru:** buat di `modules/<modul>/models.py`, lalu pastikan sudah diimpor di `app/db/registry.py`.
 7. Waktu disimpan UTC (ISO 8601). Teks untuk pengguna berbahasa Indonesia, kode dan nama variabel berbahasa Inggris.

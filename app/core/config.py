@@ -15,12 +15,11 @@ class Settings(BaseSettings):
 
     JWT_SECRET: str = ""
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    # MVP tanpa refresh token, jadi access token berlaku 8 jam.
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
 
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
 
-    GOOGLE_CLIENT_ID: str = ""
     ALLOWED_EMAIL_DOMAIN: str = "mail.ugm.ac.id"
 
     @model_validator(mode="after")
