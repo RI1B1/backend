@@ -2,11 +2,25 @@
 
 from datetime import datetime
 from decimal import Decimal
+from enum import Enum
 
 from pydantic import BaseModel
 
 from app.core.constants import DriverApplicationStatus, OrderStatus, ServiceRequestType
 from app.core.response import Meta, SuccessResponse
+
+
+class DriverAvailabilityStatus(str, Enum):
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+
+
+class DriverAvailabilityRead(BaseModel):
+    availability_status: DriverAvailabilityStatus
+
+
+class DriverAvailabilityResponse(SuccessResponse[DriverAvailabilityRead]):
+    pass
 
 
 class DriverApplicationCreate(BaseModel):

@@ -11,6 +11,7 @@ from app.db.session import get_db
 
 from . import service
 from .schemas import (
+    DriverAvailabilityResponse,
     DriverApplicationCreate,
     DriverApplicationResponse,
     DriverOrderHistoryResponse,
@@ -38,6 +39,14 @@ def get_application(
     user: CurrentUser = Depends(get_current_user),
 ):
     return service.get_application(db, user)
+
+
+@router.post("/availability/toggle", response_model=DriverAvailabilityResponse)
+def toggle_availability(
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_approved_driver),
+):
+    return service.toggle_availability(db, user)
 
 
 @router.get("/orders/history", response_model=DriverOrderHistoryResponse)

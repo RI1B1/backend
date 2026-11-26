@@ -1,5 +1,5 @@
 """Logika bisnis modul drivers. Router hanya memanggil fungsi di sini."""
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session, aliased
 
 from app.core.constants import DriverApplicationStatus
@@ -12,6 +12,37 @@ from app.modules.services.models import ServiceType
 from app.modules.users.models import User
 
 from .models import DriverApplication
+from .schemas import DriverAvailabilityStatus
+
+
+def toggle_availability(db: Session, user: CurrentUser) -> dict:
+    active = DriverAvailabilityStatus.ACTIVE.value
+    inactive = DriverAvailabilityStatus.INACTIVE.value
+    result = db.execute(
+        text(
+            """
+            UPDATE users
+            SET availability_status = CASE availability_status
+                WHEN :active THEN :inactive
+                WHEN :inactive THEN :active
+            END,
+            updated_at = CURRENT_TIMESTAMP
+            WHERE id = :user_id
+              AND availability_status IN (:active, :inactive)
+            RETURNING availability_status
+            """
+        ),
+        {"active": active, "inactive": inactive, "user_id": user.id},
+    )
+    availability_status = result.scalar_one_or_none()
+    if availability_status is None:
+        raise ConflictError(
+            ErrorCode.CONFLICT,
+            "Status ketersediaan Driver tidak dapat diubah.",
+        )
+
+    db.commit()
+    return ok({"availability_status": availability_status})
 
 
 def create_application(
