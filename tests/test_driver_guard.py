@@ -30,14 +30,15 @@ def driver_client(db_session):
     return TestClient(mini, raise_server_exceptions=False)
 
 
-def _apply(db, user, status, make_user):
-    reviewer = make_user("ADMIN") if status != "PENDING" else None
+def _apply(db, user, status):
+    reviewed_by = user.id if status != "PENDING" else None
+    reviewed_at = datetime.now(timezone.utc) if status != "PENDING" else None
     db.add(
         DriverApplication(
             user_id=user.id,
             status=status,
-            reviewed_by=reviewer.id if reviewer else None,
-            reviewed_at=datetime.now(timezone.utc) if reviewer else None,
+            reviewed_by=reviewed_by,
+            reviewed_at=reviewed_at,
         )
     )
     db.commit()
