@@ -1,17 +1,21 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).resolve().parents[2] / ".env",
+        extra="ignore",
+    )
 
     APP_NAME: str = "Anterin Dong API"
     APP_ENV: str = "development"
     API_PREFIX: str = "/api/v1"
 
-    DATABASE_URL: str = "postgresql+psycopg2://anterin:anterin@db:5432/anterin_dong"
+    DATABASE_URL: str = "postgresql+psycopg2://anterin:anterin@localhost:5432/anterin_dong"
 
     JWT_SECRET: str = ""
     JWT_ALGORITHM: str = "HS256"
