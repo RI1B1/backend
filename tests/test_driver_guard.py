@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
@@ -28,7 +30,16 @@ def driver_client(db_session):
 
 
 def _apply(db, user, status):
-    db.add(DriverApplication(user_id=user.id, status=status))
+    reviewed_by = user.id if status != "PENDING" else None
+    reviewed_at = datetime.now(timezone.utc) if status != "PENDING" else None
+    db.add(
+        DriverApplication(
+            user_id=user.id,
+            status=status,
+            reviewed_by=reviewed_by,
+            reviewed_at=reviewed_at,
+        )
+    )
     db.commit()
 
 
