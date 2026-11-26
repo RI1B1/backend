@@ -7,8 +7,8 @@ Semua endpoint ada di bawah `/api/v1`, dokumentasi Swagger di `/docs`.
 
 Siapkan Python 3.11+, PostgreSQL, dan database `anterin_dong` secara lokal. Buat
 virtual environment, pasang dependency, lalu salin `.env.example` menjadi `.env`.
-Atur `DATABASE_URL` sesuai kredensial PostgreSQL lokal dan isi `JWT_SECRET` dengan
-string acak panjang.
+Atur `DATABASE_URL` sesuai kredensial PostgreSQL yang dipakai (lokal atau Neon)
+dan isi `JWT_SECRET` dengan string acak panjang.
 
 ```powershell
 python -m venv .venv
@@ -21,23 +21,30 @@ python -m uvicorn app.main:app --reload
 - Swagger: http://localhost:8000/docs
 - Health check: http://localhost:8000/api/v1/health (`database: "up"` artinya terhubung)
 
-Jalankan migrasi dari virtual environment yang sama:
+## Skema database
 
-```bash
-python -m alembic revision --autogenerate -m "pesan singkat"
-python -m alembic upgrade head
-```
+Database Neon tim sudah dibuat dari `schema.sql`, jadi tabelnya sudah ada.
+Model SQLAlchemy dipetakan agar sesuai dengan skema tersebut; `models.py` bukan
+hasil scaffold otomatis dari database.
 
-Tes dan lint:
+Jangan jalankan `alembic upgrade head` atau `revision --autogenerate` pada
+database Neon ini dulu. Riwayat migration di `alembic/versions` masih
+menggambarkan skema lama dan belum di-baseline terhadap database yang sudah ada.
+`upgrade head` berusaha membuat tabel lagi, sedangkan autogenerate hanya
+membandingkan model dengan database untuk menyusun migration—bukan mengambil
+struktur database menjadi model.
+
+## Tes dan lint
 
 ```bash
 python -m pytest -q
 python -m ruff check .
 ```
 
-Tes memakai SQLite in-memory (lihat `tests/conftest.py`: fixture `client`, `db_session`, `make_user`),
-jadi tidak butuh Postgres. CI tambahan menjalankan `alembic upgrade head` dan `alembic check` ke Postgres.
-Selalu jalankan `alembic check` sebelum PR yang mengubah model: jika gagal, buat migration.
+Tes memakai SQLite in-memory (lihat `tests/conftest.py`: fixture `client`,
+`db_session`, `make_user`), jadi tidak butuh Postgres. Sebelum membuat atau
+menerapkan migration baru, riwayat Alembic harus lebih dulu diselaraskan dengan
+skema Neon dan disepakati tim.
 
 ## Struktur
 
@@ -65,10 +72,11 @@ Modul: `auth`, `users`, `services`, `orders`, `drivers`, `locations`, `chat`, `a
 
 ## Konvensi wajib
 
-1. **Router tipis, logika di `service.py`.** Router hanya menerima request, memanggil service, lalu mengembalikan `ok(...)`.
-2. **Respons selalu lewat helper `app/core/response.py`.**
+1. **Router tipis, logika di `service.py`.** Router hanya menerima request, memanggil service, lalu mengembalikan bentuk respons sesuai API contract.
+2. **Respons standar menggunakan helper `app/core/response.py`.**
    - Sukses: `{"success": true, "data": ..., "meta": {...}}` (meta hanya untuk daftar)
    - Gagal: `{"success": false, "error": {"code": "...", "message": "..."}}`
+   - Pengecualian: endpoint `/orders` mengikuti bentuk respons sukses pada API Reference PDF v1.3.
 3. **Error: `raise` exception dari `app/core/errors.py`**, jangan `return` manual.
    ```python
    raise NotFoundError(ErrorCode.ORDER_NOT_FOUND, "Pesanan tidak ditemukan.")
