@@ -11,9 +11,10 @@ from app.db.session import get_db
 
 from . import service
 from .schemas import (
-    DriverAvailabilityResponse,
     DriverApplicationCreate,
     DriverApplicationResponse,
+    DriverAvailabilityResponse,
+    DriverAvailabilityUpdate,
     DriverOrderHistoryResponse,
 )
 
@@ -41,12 +42,29 @@ def get_application(
     return service.get_application(db, user)
 
 
-@router.post("/availability/toggle", response_model=DriverAvailabilityResponse)
-def toggle_availability(
+@router.get(
+    "/availability",
+    response_model=DriverAvailabilityResponse,
+    response_model_exclude_none=True,
+)
+def get_availability(
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_approved_driver),
 ):
-    return service.toggle_availability(db, user)
+    return service.get_availability(db, user)
+
+
+@router.patch(
+    "/availability",
+    response_model=DriverAvailabilityResponse,
+    response_model_exclude_none=True,
+)
+def update_availability(
+    payload: DriverAvailabilityUpdate,
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_approved_driver),
+):
+    return service.update_availability(db, user, payload.availability_status)
 
 
 @router.get("/orders/history", response_model=DriverOrderHistoryResponse)
