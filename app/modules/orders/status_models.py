@@ -1,28 +1,47 @@
-
 from datetime import datetime
 
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
-    Integer,
+    Identity,
+    Index,
     String,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base
+from app.db.base import BIGINT_ID, Base
 
 
 class OrderStatusLog(Base):
     __tablename__ = "order_status_logs"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    __table_args__ = (
+        CheckConstraint(
+            "new_status IN "
+            "('OPEN', 'ACCEPTED', 'ON_THE_WAY', 'COMPLETED', 'CANCELLED')",
+            name="chk_status_log_new",
+        ),
+        CheckConstraint(
+            "old_status IS NULL OR old_status IN "
+            "('OPEN', 'ACCEPTED', 'ON_THE_WAY', 'COMPLETED', 'CANCELLED')",
+            name="chk_status_log_old",
+        ),
+        Index("idx_status_logs_order", "order_id", "created_at"),
+        Index("idx_status_logs_user", "changed_by"),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BIGINT_ID,
+        Identity(always=True),
+        primary_key=True,
+    )
 
     order_id: Mapped[int] = mapped_column(
-        ForeignKey("orders.id"),
+        BIGINT_ID,
+        ForeignKey("orders.id", ondelete="CASCADE"),
         nullable=False,
-        index=True,
     )
 
     old_status: Mapped[str | None] = mapped_column(
@@ -36,26 +55,13 @@ class OrderStatusLog(Base):
     )
 
     changed_by: Mapped[int] = mapped_column(
-        ForeignKey("users.id"),
+        BIGINT_ID,
+        ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
-        index=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
-    )
-
-    __table_args__ = (
-        CheckConstraint(
-            "old_status IS NULL OR old_status IN "
-            "('OPEN', 'ACCEPTED', 'ON_THE_WAY', 'COMPLETED', 'CANCELLED')",
-            name="ck_order_status_logs_old_status",
-        ),
-        CheckConstraint(
-            "new_status IN "
-            "('OPEN', 'ACCEPTED', 'ON_THE_WAY', 'COMPLETED', 'CANCELLED')",
-            name="ck_order_status_logs_new_status",
-        ),
     )
