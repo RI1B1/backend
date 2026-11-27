@@ -1,6 +1,9 @@
+from datetime import datetime, timezone
+
 import pytest
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import register_exception_handlers
 from app.core.response import ok
@@ -28,7 +31,16 @@ def driver_client(db_session):
 
 
 def _apply(db, user, status):
-    db.add(DriverApplication(user_id=user.id, status=status))
+    reviewed_by = user.id if status != "PENDING" else None
+    reviewed_at = datetime.now(timezone.utc) if status != "PENDING" else None
+    db.add(
+        DriverApplication(
+            user_id=user.id,
+            status=status,
+            reviewed_by=reviewed_by,
+            reviewed_at=reviewed_at,
+        )
+    )
     db.commit()
 
 
@@ -42,7 +54,7 @@ def test_user_without_application_is_rejected(driver_client, make_user):
 @pytest.mark.parametrize("status", ["PENDING", "REJECTED"])
 def test_pending_or_rejected_driver_is_rejected(driver_client, db_session, make_user, status):
     user = make_user("DRIVER")  # role DRIVER saja tidak cukup
-    _apply(db_session, user, status)
+    _apply(db_session, user, status, make_user)
     res = driver_client.get("/driver-only", headers=auth_header(user.id, "DRIVER"))
     assert res.status_code == 403
     assert res.json()["error"]["code"] == "DRIVER_NOT_APPROVED"
@@ -50,7 +62,7 @@ def test_pending_or_rejected_driver_is_rejected(driver_client, db_session, make_
 
 def test_approved_driver_is_allowed(driver_client, db_session, make_user):
     user = make_user("DRIVER")
-    _apply(db_session, user, "APPROVED")
+    _apply(db_session, user, "APPROVED", make_user)
     res = driver_client.get("/driver-only", headers=auth_header(user.id, "DRIVER"))
     assert res.status_code == 200
     assert res.json()["data"]["user_id"] == user.id
@@ -58,7 +70,15 @@ def test_approved_driver_is_allowed(driver_client, db_session, make_user):
 
 def test_approved_but_inactive_driver_is_rejected(driver_client, db_session, make_user):
     user = make_user("DRIVER", is_active=False)
-    _apply(db_session, user, "APPROVED")
+    _apply(db_session, user, "APPROVED", make_user)
     res = driver_client.get("/driver-only", headers=auth_header(user.id, "DRIVER"))
     assert res.status_code == 403
     assert res.json()["error"]["code"] == "USER_SUSPENDED"
+
+
+def test_reviewed_application_requires_reviewer_and_time(db_session, make_user):
+    user = make_user("DRIVER")
+    db_session.add(DriverApplication(user_id=user.id, status="APPROVED"))
+
+    with pytest.raises(IntegrityError):
+        db_session.commit()

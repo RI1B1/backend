@@ -16,6 +16,7 @@ Backend selalu memeriksa role dan status akun ke database, jadi `role` di token 
 { "success": true, "data": { } }
 { "success": true, "data": [ ], "meta": { "page": 1, "limit": 20, "total": 57 } }
 ```
+Endpoint Order mengikuti bentuk respons sukses pada API Reference PDF v1.3 dan tidak memakai envelope di atas.
 **Gagal**
 ```json
 { "success": false, "error": { "code": "ORDER_NOT_FOUND", "message": "Pesanan tidak ditemukan.", "details": null } }
@@ -36,23 +37,17 @@ Untuk 422, `details` berisi `[{ "field": "email", "message": "..." }]`.
 // Order
 {
   "id": 10,
-  "status": "OPEN",                       // OPEN | ACCEPTED | ON_THE_WAY | COMPLETED | CANCELLED
-  "service_type": { "id": 1, "name": "Antar-Jemput", "code": "ANTAR_JEMPUT" },
-  "customer": { "id": 1, "name": "Budi" },
-  "driver": null,                         // { "id": 2, "name": "Sari" } setelah ACCEPTED
-  "pickup_location": { "id": 3, "name": "...", "category": "...", "latitude": 0, "longitude": 0 },
-  "destination_location": { "id": 5, "name": "...", "category": "...", "latitude": 0, "longitude": 0 },
-  "service_request_type": null,           // AMBIL_BARANG | BELIKAN_BARANG (hanya Jasa Titip)
-  "item_description": null,
-  "passenger_count": 1,
-  "optional_cost_expectation": 15000,     // opsional, bukan tarif resmi
-  "notes": "Tunggu di lobi",
-  "created_at": "2026-11-25T03:00:00Z",
-  "updated_at": "2026-11-25T03:00:00Z"
+  "customer_id": 1,
+  "driver_id": null,
+  "service_type": "ANTAR_JEMPUT",
+  "pickup_location_id": 3,
+  "destination_location_id": 5,
+  "description": "Antar ke tujuan",
+  "expected_cost": 15000,
+  "status": "OPEN"
 }
 ```
-Lokasi pada Order tetap ditampilkan walau lokasi kemudian dinonaktifkan (PRD 6.9).
-Email Customer/Driver **tidak** ditampilkan pada Order; hanya `id` dan `name`.
+Success response Order tidak menggunakan envelope `success`/`data`.
 
 ## 3. Endpoint
 
@@ -75,31 +70,30 @@ Pesan `INVALID_CREDENTIALS` sama untuk email tidak ada dan password salah.
 | `GET /locations/{id}` | Login | 404 `LOCATION_NOT_FOUND` |
 
 ### Orders
+Endpoint Order mengikuti payload dan bentuk respons sukses pada **API Reference PDF v1.3**.
+Field API dipetakan ke model database yang tersedia: `service_type` ke `service_types.code`,
+`description` ke `orders.notes` untuk Antar-Jemput atau `orders.item_description` untuk Jasa Titip,
+dan `expected_cost` ke `orders.optional_cost_expectation`. Tidak ada perubahan skema database.
+PDF tidak meminta `passenger_count` atau `service_request_type`, sehingga nilai tersebut tidak
+dapat diisi dari request PDF dan tetap `NULL` pada model.
+
 | Method & path | Akses | Request / Response |
 |---|---|---|
-| `POST /orders` | CUSTOMER, DRIVER | Lihat payload di bawah → `Order` (201), status `OPEN` |
-| `GET /orders/my` | Login | Pesanan milik pengguna sebagai Customer. Query `status`, pagination → `Order[]` |
-| `GET /orders/available` | DRIVER* | Hanya status `OPEN`, terbaru dulu, pagination → `Order[]` |
-| `GET /orders/{id}` | Login | Hanya Customer pemilik, Driver penerima, Driver* untuk order `OPEN`, atau ADMIN. Selain itu 403 `ORDER_ACCESS_DENIED` |
-| `POST /orders/{id}/accept` | DRIVER* | Tanpa body → `Order` (status `ACCEPTED`). Atomic. 409 `ORDER_ALREADY_TAKEN` jika sudah diambil/ bukan `OPEN` |
-| `PATCH /orders/{id}/status` | DRIVER* (penerima) | `{ "status": "ON_THE_WAY" }` lalu `{ "status": "COMPLETED" }` → `Order`. 409 `INVALID_STATUS_TRANSITION` |
-| `POST /orders/{id}/cancel` | CUSTOMER (pemilik) | Tanpa body → `Order` (`CANCELLED`). 409 `ORDER_NOT_CANCELLABLE` jika bukan `OPEN` |
+| `POST /orders` | CUSTOMER | `{ "service_type", "pickup_location_id", "destination_location_id", "description", "expected_cost?" }` → `{ "message", "order" }` (201), status `OPEN` |
+| `GET /orders/my` | CUSTOMER | `{ "orders": [...] }`, hanya pesanan Customer yang login |
+| `GET /orders/available` | DRIVER* | Hanya status `OPEN`, terbaru dulu, pagination → `Order[]` (PIC endpoint: Azka) |
+| `GET /orders/{id}` | CUSTOMER pemilik, DRIVER penerima, ADMIN | Detail order; selain itu 403 `ORDER_ACCESS_DENIED` |
+| `POST /orders/{id}/accept` | DRIVER* | Tanpa body → `Order` (status `ACCEPTED`). Atomic (PIC endpoint: Azka) |
+| `PATCH /orders/{id}/status` | DRIVER penerima dan APPROVED | `{ "status": "ON_THE_WAY" }` lalu `{ "status": "COMPLETED" }` → `{ "message", "order" }` |
+| `POST /orders/{id}/cancel` | CUSTOMER pemilik | Tanpa body → `{ "message", "order" }` (`CANCELLED`); 409 `ORDER_NOT_CANCELLABLE` jika bukan `OPEN` |
+| `GET /orders/{id}/status-history` | CUSTOMER pemilik, DRIVER penerima, ADMIN | `{ "status_history": [...] }`; log status ditulis oleh business logic |
 
-Payload `POST /orders`:
-```jsonc
-// Antar-Jemput
-{ "service_type_id": 1, "pickup_location_id": 3, "destination_location_id": 5,
-  "passenger_count": 1, "notes": "…", "optional_cost_expectation": 15000 }
-
-// Jasa Titip
-{ "service_type_id": 2, "service_request_type": "BELIKAN_BARANG",
-  "pickup_location_id": 7,        // lokasi asal / toko
-  "destination_location_id": 5,
-  "item_description": "Fotokopi 20 lembar", "notes": "…", "optional_cost_expectation": 10000 }
-```
-Validasi: lokasi harus ada dan aktif (`LOCATION_NOT_FOUND`/`LOCATION_INACTIVE`); `passenger_count` ≥ 1 (Antar-Jemput);
-Jasa Titip wajib `service_request_type` dan `item_description`; `optional_cost_expectation` ≥ 0 dan opsional;
-pickup dan destination tidak boleh sama. Setiap perubahan status dicatat di `order_status_logs`.
+`service_type` hanya menerima `ANTAR_JEMPUT` atau `JASA_TITIP`. Lokasi harus ada dan aktif
+(`LOCATION_NOT_FOUND`/`LOCATION_INACTIVE`), lokasi awal dan tujuan tidak boleh sama,
+`description` wajib diisi, dan `expected_cost` opsional dengan presisi maksimal dua desimal
+serta nilai sesuai `NUMERIC(12,2)`.
+Order baru disimpan dengan `driver_id = null` dan status `OPEN`. Setiap perubahan status
+dicatat dalam `order_status_logs`.
 
 ### Messages (chat)
 | Method & path | Akses | Request / Response |

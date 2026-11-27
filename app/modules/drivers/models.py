@@ -1,4 +1,3 @@
-
 """Model SQLAlchemy modul drivers."""
 
 from datetime import datetime
@@ -7,14 +6,15 @@ from sqlalchemy import (
     CheckConstraint,
     DateTime,
     ForeignKey,
-    Integer,
+    Identity,
+    Index,
     String,
     Text,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import BIGINT_ID, Base, TimestampMixin
 
 
 class DriverApplication(Base, TimestampMixin):
@@ -23,21 +23,29 @@ class DriverApplication(Base, TimestampMixin):
     __table_args__ = (
         CheckConstraint(
             "status IN ('PENDING', 'APPROVED', 'REJECTED')",
-            name="ck_driver_applications_status",
+            name="chk_driver_app_status",
+        ),
+        CheckConstraint(
+            "status = 'PENDING' OR "
+            "(reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL)",
+            name="chk_driver_app_review",
+        ),
+        CheckConstraint(
+            "status = 'PENDING' OR (reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL)",
+            name="ck_driver_applications_review",
         ),
     )
 
     id: Mapped[int] = mapped_column(
-        Integer,
+        BIGINT_ID,
+        Identity(always=True),
         primary_key=True,
-        autoincrement=True,
     )
 
     user_id: Mapped[int] = mapped_column(
-        Integer,
-        ForeignKey("users.id"),
+        BIGINT_ID,
+        ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=False,
-        index=True,
     )
 
     status: Mapped[str] = mapped_column(
@@ -53,8 +61,8 @@ class DriverApplication(Base, TimestampMixin):
     )
 
     reviewed_by: Mapped[int | None] = mapped_column(
-        Integer,
-        ForeignKey("users.id"),
+        BIGINT_ID,
+        ForeignKey("users.id", ondelete="RESTRICT"),
         nullable=True,
     )
 

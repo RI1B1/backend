@@ -33,6 +33,7 @@ EXPECTED = {
     ("POST", "/orders/{id}/accept"),
     ("PATCH", "/orders/{id}/status"),
     ("POST", "/orders/{id}/cancel"),
+    ("GET", "/orders/{id}/status-history"),
     ("GET", "/orders/{id}/messages"),
     ("POST", "/orders/{id}/messages"),
     ("POST", "/driver/applications"),
