@@ -25,7 +25,7 @@ def get_availability(db: Session, user: CurrentUser) -> dict:
             ErrorCode.CONFLICT,
             "Status ketersediaan Driver tidak ditemukan.",
         )
-    return ok({"availability_status": availability_status})
+    return {"availability": availability_status}
 
 
 def update_availability(
@@ -56,7 +56,10 @@ def update_availability(
         )
 
     db.commit()
-    return ok({"availability_status": availability_status})
+    return {
+        "message": "Availability berhasil diperbarui",
+        "availability": availability_status,
+    }
 
 
 def create_application(

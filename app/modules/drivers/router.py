@@ -64,7 +64,7 @@ def update_availability(
     db: Session = Depends(get_db),
     user: CurrentUser = Depends(require_approved_driver),
 ):
-    return service.update_availability(db, user, payload.availability_status)
+    return service.update_availability(db, user, payload.availability)
 
 
 @router.get("/orders/history", response_model=DriverOrderHistoryResponse)

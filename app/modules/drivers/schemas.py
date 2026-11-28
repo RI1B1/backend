@@ -16,15 +16,12 @@ class DriverAvailabilityStatus(str, Enum):
 
 
 class DriverAvailabilityUpdate(BaseModel):
-    availability_status: DriverAvailabilityStatus
+    availability: DriverAvailabilityStatus
 
 
-class DriverAvailabilityRead(BaseModel):
-    availability_status: DriverAvailabilityStatus
-
-
-class DriverAvailabilityResponse(SuccessResponse[DriverAvailabilityRead]):
-    pass
+class DriverAvailabilityResponse(BaseModel):
+    message: str | None = None
+    availability: DriverAvailabilityStatus
 
 
 class DriverApplicationCreate(BaseModel):
