@@ -15,6 +15,10 @@ class DriverAvailabilityStatus(str, Enum):
     INACTIVE = "INACTIVE"
 
 
+class DriverAvailabilityUpdate(BaseModel):
+    availability_status: DriverAvailabilityStatus
+
+
 class DriverAvailabilityRead(BaseModel):
     availability_status: DriverAvailabilityStatus
 

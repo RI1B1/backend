@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Path, status
 from sqlalchemy.orm import Session
 
+from app.core.pagination import PageParams
 from app.core.security import (
     CurrentUser,
     Role,
@@ -10,7 +11,12 @@ from app.core.security import (
 )
 from app.db.session import get_db
 from app.modules.orders import service
-from app.modules.orders.schemas import OrderCreate, OrderStatusUpdate
+from app.modules.orders.schemas import (
+    OrderAcceptResponse,
+    OrderCreate,
+    OrderListResponse,
+    OrderStatusUpdate,
+)
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
@@ -30,6 +36,32 @@ def get_my_orders(
     db: Session = Depends(get_db),
 ):
     return service.get_my_orders(db, user.id)
+
+
+# Harus di atas "/{order_id}" supaya "available" tidak dibaca sebagai order_id.
+@router.get(
+    "/available",
+    response_model=OrderListResponse,
+)
+def get_available_orders(
+    params: PageParams = Depends(),
+    db: Session = Depends(get_db),
+    _user: CurrentUser = Depends(require_approved_driver),
+):
+    return service.get_available_orders(db, params.page, params.limit)
+
+
+@router.post(
+    "/{order_id}/accept",
+    response_model=OrderAcceptResponse,
+    response_model_exclude={"meta"},
+)
+def accept_order(
+    order_id: int = Path(gt=0),
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_approved_driver),
+):
+    return service.accept_order(db, order_id, user)
 
 
 @router.patch("/{order_id}/status")

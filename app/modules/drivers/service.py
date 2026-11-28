@@ -15,24 +15,38 @@ from .models import DriverApplication
 from .schemas import DriverAvailabilityStatus
 
 
-def toggle_availability(db: Session, user: CurrentUser) -> dict:
-    active = DriverAvailabilityStatus.ACTIVE.value
-    inactive = DriverAvailabilityStatus.INACTIVE.value
+def get_availability(db: Session, user: CurrentUser) -> dict:
+    availability_status = db.execute(
+        text("SELECT availability_status FROM users WHERE id = :user_id"),
+        {"user_id": user.id},
+    ).scalar_one_or_none()
+    if availability_status is None:
+        raise ConflictError(
+            ErrorCode.CONFLICT,
+            "Status ketersediaan Driver tidak ditemukan.",
+        )
+    return ok({"availability_status": availability_status})
+
+
+def update_availability(
+    db: Session,
+    user: CurrentUser,
+    availability_status: DriverAvailabilityStatus,
+) -> dict:
     result = db.execute(
         text(
             """
             UPDATE users
-            SET availability_status = CASE availability_status
-                WHEN :active THEN :inactive
-                WHEN :inactive THEN :active
-            END,
+            SET availability_status = :availability_status,
             updated_at = CURRENT_TIMESTAMP
             WHERE id = :user_id
-              AND availability_status IN (:active, :inactive)
             RETURNING availability_status
             """
         ),
-        {"active": active, "inactive": inactive, "user_id": user.id},
+        {
+            "availability_status": availability_status.value,
+            "user_id": user.id,
+        },
     )
     availability_status = result.scalar_one_or_none()
     if availability_status is None:
