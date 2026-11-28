@@ -30,10 +30,8 @@ class DriverApplication(Base, TimestampMixin):
             "(reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL)",
             name="chk_driver_app_review",
         ),
-        CheckConstraint(
-            "status = 'PENDING' OR (reviewed_by IS NOT NULL AND reviewed_at IS NOT NULL)",
-            name="ck_driver_applications_review",
-        ),
+        Index("idx_driver_app_user", "user_id"),
+        Index("idx_driver_app_status", "status"),
     )
 
     id: Mapped[int] = mapped_column(
