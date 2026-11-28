@@ -60,6 +60,92 @@ def test_admin_list_includes_inactive_locations(client, db_session, make_user):
     ]
 
 
+# ------------------------------------------------------- POST /admin/locations (11.6)
+
+
+def test_admin_create_requires_login(client):
+    res = client.post("/api/v1/admin/locations", json={"name": "Fakultas Teknik"})
+    assert res.status_code == 401
+
+
+def test_admin_create_forbidden_for_non_admin(client, db_session, make_user):
+    for role in ("CUSTOMER", "DRIVER"):
+        user = make_user(role)
+        res = client.post(
+            "/api/v1/admin/locations",
+            json={"name": "Fakultas Teknik"},
+            headers=auth_header(user.id, role),
+        )
+        assert res.status_code == 403
+    assert db_session.query(Location).count() == 0
+
+
+def test_admin_create_success(client, db_session, make_user):
+    res = client.post(
+        "/api/v1/admin/locations",
+        json={"name": "  Fakultas Teknik  ", "description": "Area Fakultas Teknik"},
+        headers=_admin_headers(make_user),
+    )
+
+    assert res.status_code == 201
+    body = res.json()
+    assert body == {
+        "message": "Lokasi berhasil ditambahkan",
+        "location": {
+            "id": body["location"]["id"],
+            "name": "Fakultas Teknik",
+            "description": "Area Fakultas Teknik",
+            "is_active": True,
+        },
+    }
+    saved = db_session.get(Location, body["location"]["id"])
+    assert saved.name == "Fakultas Teknik"
+    assert saved.is_active is True
+    assert saved.category  # kolom NOT NULL terisi
+
+
+def test_admin_create_without_description(client, make_user):
+    res = client.post(
+        "/api/v1/admin/locations",
+        json={"name": "Perpustakaan Pusat"},
+        headers=_admin_headers(make_user),
+    )
+    assert res.status_code == 201
+    assert res.json()["location"]["description"] is None
+
+
+def test_admin_create_duplicate_returns_409(client, db_session, make_user):
+    _create_location(db_session, "Fakultas Teknik")
+
+    res = client.post(
+        "/api/v1/admin/locations",
+        json={"name": "fakultas teknik"},  # beda huruf besar-kecil
+        headers=_admin_headers(make_user),
+    )
+
+    assert res.status_code == 409
+    assert res.json()["error"]["code"] == "CONFLICT"
+    assert db_session.query(Location).count() == 1
+
+
+def test_admin_create_invalid_input_returns_422(client, db_session, make_user):
+    headers = _admin_headers(make_user)
+
+    for payload in (
+        {},
+        {"name": ""},
+        {"name": "   "},
+        {"name": None},
+        {"name": "x" * 151},
+        {"name": 123},
+    ):
+        res = client.post("/api/v1/admin/locations", json=payload, headers=headers)
+        assert res.status_code == 422, payload
+        assert res.json()["error"]["code"] == "VALIDATION_ERROR"
+
+    assert db_session.query(Location).count() == 0
+
+
 # ------------------------------------------- PATCH /admin/locations/{location_id} (11.7)
 
 
@@ -132,6 +218,22 @@ def test_admin_update_does_not_change_is_active(client, db_session, make_user):
     assert res.json()["location"]["is_active"] is False
 
 
+def test_admin_update_duplicate_name_returns_409(client, db_session, make_user):
+    _create_location(db_session, "Fakultas Teknik")
+    other = _create_location(db_session, "Perpustakaan Pusat")
+
+    res = client.patch(
+        f"/api/v1/admin/locations/{other.id}",
+        json={"name": "fakultas teknik"},
+        headers=_admin_headers(make_user),
+    )
+
+    assert res.status_code == 409
+    assert res.json()["error"]["code"] == "CONFLICT"
+    db_session.refresh(other)
+    assert other.name == "Perpustakaan Pusat"
+
+
 def test_admin_update_not_found_returns_404(client, make_user):
     res = client.patch(
         "/api/v1/admin/locations/9999",
@@ -148,10 +250,8 @@ def test_admin_update_invalid_input_returns_422(client, db_session, make_user):
     url = f"/api/v1/admin/locations/{location.id}"
 
     for payload in (
-        {},  # tidak ada field yang diisi
         {"name": ""},
         {"name": "   "},
-        {"name": None},
         {"name": "x" * 151},
         {"name": 123},
     ):
