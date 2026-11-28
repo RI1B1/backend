@@ -1,60 +1,80 @@
 """Schema Pydantic (request/response) modul orders."""
-"""Schema Pydantic (request/response) modul orders."""
-from enum import Enum
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from datetime import datetime
+from decimal import Decimal
+from typing import Literal
+
+from pydantic import BaseModel, Field, field_validator
+
+from app.core.constants import OrderStatus, ServiceRequestType
+from app.core.response import Meta, SuccessResponse
 
 
-class ServiceTypeEnum(str, Enum):
-    ANTAR_JEMPUT = "ANTAR_JEMPUT"
-    JASA_TITIP = "JASA_TITIP"
-
-
-class OrderStatusEnum(str, Enum):
-    OPEN = "OPEN"
-    ACCEPTED = "ACCEPTED"
-    ON_THE_WAY = "ON_THE_WAY"
-    COMPLETED = "COMPLETED"
-    CANCELLED = "CANCELLED"
-
-
-class OrderCreateRequest(BaseModel):
-    service_type: ServiceTypeEnum
-    pickup_location_id: int = Field(..., gt=0, description="ID lokasi awal dari katalog preset")
-    destination_location_id: int = Field(..., gt=0, description="ID lokasi tujuan dari katalog preset")
-    description: str = Field(..., min_length=1, description="Detail kebutuhan pesanan")
-    expected_cost: int | None = Field(
+class OrderCreate(BaseModel):
+    service_type: Literal["ANTAR_JEMPUT", "JASA_TITIP"]
+    pickup_location_id: int = Field(gt=0)
+    destination_location_id: int = Field(gt=0)
+    description: str = Field(min_length=1)
+    expected_cost: Decimal | None = Field(
         default=None,
         ge=0,
-        description="Perkiraan biaya opsional, tidak boleh negatif",
+        le=Decimal("9999999999.99"),
+        max_digits=12,
+        decimal_places=2,
     )
 
     @field_validator("description")
     @classmethod
-    def validate_description_not_blank(cls, value: str) -> str:
-        cleaned = value.strip()
-        if not cleaned:
-            raise ValueError("Deskripsi pesanan wajib diisi dan tidak boleh kosong.")
-        return cleaned
+    def description_must_not_be_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Deskripsi wajib diisi.")
+        return value
 
 
-class OrderResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
+class OrderStatusUpdate(BaseModel):
+    status: Literal["ON_THE_WAY", "COMPLETED"]
 
+
+class OrderUserRead(BaseModel):
     id: int
-    customer_id: str
-    driver_id: str | None = None
-    service_type: str
-    pickup_location_id: int
-    destination_location_id: int
-    description: str
-    expected_cost: int | None = None
-    status: str
+    name: str
 
 
-class OrderStatusUpdateRequest(BaseModel):
-    status: OrderStatusEnum
-
-
-class OrderStatusResponse(BaseModel):
+class OrderLocationRead(BaseModel):
     id: int
-    status: str
+    name: str
+    category: str
+    latitude: float | None
+    longitude: float | None
+
+
+class OrderServiceTypeRead(BaseModel):
+    id: int
+    name: str
+    code: str
+
+
+class OrderRead(BaseModel):
+    id: int
+    status: OrderStatus
+    service_type: OrderServiceTypeRead
+    customer: OrderUserRead
+    driver: OrderUserRead | None
+    pickup_location: OrderLocationRead | None
+    destination_location: OrderLocationRead | None
+    service_request_type: ServiceRequestType | None
+    item_description: str | None
+    passenger_count: int | None
+    optional_cost_expectation: Decimal | None
+    notes: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class OrderAcceptResponse(SuccessResponse[OrderRead]):
+    pass
+
+
+class OrderListResponse(SuccessResponse[list[OrderRead]]):
+    meta: Meta

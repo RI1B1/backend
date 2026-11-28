@@ -1,15 +1,49 @@
-"""Model SQLAlchemy modul services. Didaftarkan di app/db/registry.py."""
-from app.db.base import Base, TimestampMixin  # noqa: F401
-"""Model SQLAlchemy modul services. Didaftarkan di app/db/registry.py."""
-from sqlalchemy import Integer, String, Text
+"""Model SQLAlchemy modul services."""
+
+from sqlalchemy import (
+    Boolean,
+    Identity,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import BIGINT_ID, Base
 
 
-class ServiceType(Base, TimestampMixin):
+class ServiceType(Base):
     __tablename__ = "service_types"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
-    description: Mapped[str] = mapped_column(Text, nullable=False)
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_service_types_code"),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BIGINT_ID,
+        Identity(always=True),
+        primary_key=True,
+    )
+
+    name: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+    )
+
+    code: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+    )
+
+    description: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=text("true"),
+    )

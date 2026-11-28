@@ -1,11 +1,15 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, func
+from sqlalchemy import BigInteger, DateTime, Integer, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
     pass
+
+
+# PostgreSQL uses BIGINT; SQLite tests need INTEGER for autoincrement primary keys.
+BIGINT_ID = BigInteger().with_variant(Integer, "sqlite")
 
 
 class TimestampMixin:

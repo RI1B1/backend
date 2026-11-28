@@ -1,65 +1,107 @@
-from fastapi import APIRouter
-
-router = APIRouter(prefix="/orders", tags=["Orders"])
-
-# TODO (orders): tambahkan endpoint di sini. Logika bisnis taruh di service.py.
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Path, status
 from sqlalchemy.orm import Session
 
-from app.core.response import ok
-from app.core.security import CurrentUser, Role, get_current_user, require_role
-from app.db.session import get_db
-from app.modules.orders.schemas import (
-    OrderCreateRequest,
-    OrderResponse,
-    OrderStatusResponse,
-    OrderStatusUpdateRequest,
+from app.core.pagination import PageParams
+from app.core.security import (
+    CurrentUser,
+    Role,
+    get_current_user,
+    require_approved_driver,
+    require_role,
 )
-from app.modules.orders.service import cancel_order, create_order, update_order_status
+from app.db.session import get_db
+from app.modules.orders import service
+from app.modules.orders.schemas import (
+    OrderAcceptResponse,
+    OrderCreate,
+    OrderListResponse,
+    OrderStatusUpdate,
+)
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
+
+
+@router.get(
+    "/available",
+    response_model=OrderListResponse,
+)
+def get_available_orders(
+    params: PageParams = Depends(),
+    db: Session = Depends(get_db),
+    _user: CurrentUser = Depends(require_approved_driver),
+):
+    return service.get_available_orders(db, params.page, params.limit)
+
+
+@router.post(
+    "/{order_id}/accept",
+    response_model=OrderAcceptResponse,
+    response_model_exclude={"meta"},
+)
+def accept_order(
+    order_id: int = Path(gt=0),
+    db: Session = Depends(get_db),
+    user: CurrentUser = Depends(require_approved_driver),
+):
+    return service.accept_order(db, order_id, user)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-def create_new_order(
-    payload: OrderCreateRequest,
+def create_order(
+    payload: OrderCreate,
+    user: CurrentUser = Depends(require_role(Role.CUSTOMER)),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_role(Role.CUSTOMER)),
 ):
-    order = create_order(db=db, payload=payload, current_user=current_user)
-    return ok({
-        "message": "Order berhasil dibuat",
-        "order": OrderResponse.model_validate(order).model_dump(),
-    })
+    return service.create_order(db, user.id, payload)
 
 
-@router.post("/{order_id}/cancel")
-def cancel_existing_order(
-    order_id: int,
+@router.get("/my")
+def get_my_orders(
+    user: CurrentUser = Depends(require_role(Role.CUSTOMER)),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(require_role(Role.CUSTOMER)),
 ):
-    order = cancel_order(db=db, order_id=order_id, current_user=current_user)
-    return ok({
-        "message": "Order berhasil dibatalkan",
-        "order": OrderStatusResponse(id=order.id, status=order.status).model_dump(),
-    })
+    return service.get_my_orders(db, user.id)
 
 
 @router.patch("/{order_id}/status")
-def patch_order_status(
+def update_order_status(
     order_id: int,
-    payload: OrderStatusUpdateRequest,
+    payload: OrderStatusUpdate,
+    user: CurrentUser = Depends(require_role(Role.DRIVER)),
+    approved_driver: CurrentUser = Depends(require_approved_driver),
     db: Session = Depends(get_db),
-    current_user: CurrentUser = Depends(get_current_user),
 ):
-    order = update_order_status(
-        db=db,
-        order_id=order_id,
-        new_status=payload.status,
-        current_user=current_user,
-    )
-    return ok({
+    return {
         "message": "Status order berhasil diperbarui",
-        "order": OrderStatusResponse(id=order.id, status=order.status).model_dump(),
-    })
+        "order": service.update_order_status(db, order_id, user.id, payload.status),
+    }
+
+
+@router.post("/{order_id}/cancel")
+def cancel_order(
+    order_id: int,
+    user: CurrentUser = Depends(require_role(Role.CUSTOMER)),
+    db: Session = Depends(get_db),
+):
+    return {
+        "message": "Order berhasil dibatalkan",
+        "order": service.cancel_order(db, order_id, user.id),
+    }
+
+
+@router.get("/{order_id}/status-history")
+def get_order_status_history(
+    order_id: int,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return service.get_order_status_history(db, order_id, user)
+
+
+@router.get("/{order_id}")
+def get_order(
+    order_id: int,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return service.get_order(db, order_id, user)

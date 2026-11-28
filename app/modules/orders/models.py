@@ -1,32 +1,144 @@
-"""Model SQLAlchemy modul orders. Didaftarkan di app/db/registry.py."""
-from app.db.base import Base, TimestampMixin  # noqa: F401
-"""Model SQLAlchemy modul orders. Didaftarkan di app/db/registry.py."""
-from sqlalchemy import ForeignKey, Integer, String, Text
+from decimal import Decimal
+
+from sqlalchemy import (
+    CheckConstraint,
+    ForeignKey,
+    Identity,
+    Index,
+    Numeric,
+    SmallInteger,
+    String,
+    Text,
+    desc,
+    text,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.base import Base, TimestampMixin
+from app.db.base import BIGINT_ID, Base, TimestampMixin
 
 
 class Order(Base, TimestampMixin):
     __tablename__ = "orders"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    customer_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    driver_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
-    service_type: Mapped[str] = mapped_column(String(50), nullable=False)
-    pickup_location_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    destination_location_id: Mapped[int] = mapped_column(Integer, nullable=False)
-    description: Mapped[str] = mapped_column(Text, nullable=False)
-    expected_cost: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    status: Mapped[str] = mapped_column(String(30), nullable=False, default="OPEN", index=True)
-
-
-class OrderStatusLog(Base, TimestampMixin):
-    __tablename__ = "order_status_logs"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    order_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("orders.id", ondelete="CASCADE"), nullable=False, index=True
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('OPEN', 'ACCEPTED', 'ON_THE_WAY', 'COMPLETED', 'CANCELLED')",
+            name="chk_orders_status",
+        ),
+        CheckConstraint(
+            "service_request_type IS NULL OR "
+            "service_request_type IN ('AMBIL_BARANG', 'BELIKAN_BARANG')",
+            name="chk_orders_request_type",
+        ),
+        CheckConstraint(
+            "passenger_count IS NULL OR passenger_count > 0",
+            name="chk_orders_passenger",
+        ),
+        CheckConstraint(
+            "optional_cost_expectation IS NULL "
+            "OR optional_cost_expectation >= 0",
+            name="chk_orders_cost",
+        ),
+        CheckConstraint(
+            "(status IN ('OPEN', 'CANCELLED') AND driver_id IS NULL) OR "
+            "(status IN ('ACCEPTED', 'ON_THE_WAY', 'COMPLETED') "
+            "AND driver_id IS NOT NULL)",
+            name="chk_orders_driver_by_status",
+        ),
+        Index("idx_orders_customer", "customer_id", desc("created_at")),
+        Index(
+            "idx_orders_driver",
+            "driver_id",
+            desc("created_at"),
+            postgresql_where=text("driver_id IS NOT NULL"),
+            sqlite_where=text("driver_id IS NOT NULL"),
+        ),
+        Index("idx_orders_status", "status"),
+        Index("idx_orders_service_type", "service_type_id"),
+        Index(
+            "idx_orders_open_created",
+            desc("created_at"),
+            postgresql_where=text("status = 'OPEN'"),
+            sqlite_where=text("status = 'OPEN'"),
+        ),
+        Index(
+            "idx_orders_pickup_loc",
+            "pickup_location_id",
+            postgresql_where=text("pickup_location_id IS NOT NULL"),
+            sqlite_where=text("pickup_location_id IS NOT NULL"),
+        ),
+        Index(
+            "idx_orders_dest_loc",
+            "destination_location_id",
+            postgresql_where=text("destination_location_id IS NOT NULL"),
+            sqlite_where=text("destination_location_id IS NOT NULL"),
+        ),
     )
-    status: Mapped[str] = mapped_column(String(30), nullable=False)
-    changed_by: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    id: Mapped[int] = mapped_column(
+        BIGINT_ID,
+        Identity(always=True),
+        primary_key=True,
+    )
+
+    customer_id: Mapped[int] = mapped_column(
+        BIGINT_ID,
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+
+    driver_id: Mapped[int | None] = mapped_column(
+        BIGINT_ID,
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+
+    service_type_id: Mapped[int] = mapped_column(
+        BIGINT_ID,
+        ForeignKey("service_types.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="OPEN",
+        server_default=text("'OPEN'"),
+    )
+
+    pickup_location_id: Mapped[int | None] = mapped_column(
+        BIGINT_ID,
+        ForeignKey("locations.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+
+    destination_location_id: Mapped[int | None] = mapped_column(
+        BIGINT_ID,
+        ForeignKey("locations.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+
+    service_request_type: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+
+    item_description: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    passenger_count: Mapped[int | None] = mapped_column(
+        SmallInteger,
+        nullable=True,
+    )
+
+    optional_cost_expectation: Mapped[Decimal | None] = mapped_column(
+        Numeric(12, 2),
+        nullable=True,
+    )
+
+    notes: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )

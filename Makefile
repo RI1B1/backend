@@ -1,10 +1,12 @@
-up:        ## jalankan app + database
-	docker compose up --build
-migrate:   ## terapkan migrasi
-	docker compose exec api alembic upgrade head
-revision:  ## buat migrasi baru: make revision m="tambah tabel users"
-	docker compose exec api alembic revision --autogenerate -m "$(m)"
+run:       ## jalankan API lokal
+	python -m uvicorn app.main:app --reload
+migrate:   ## ditahan sampai riwayat Alembic diselaraskan dengan schema.sql
+	@echo "Alembic belum di-baseline dengan schema.sql; upgrade dibatalkan."
+	@exit 1
+revision:  ## ditahan sampai riwayat Alembic diselaraskan dengan schema.sql
+	@echo "Jangan autogenerate migration sebelum baseline Alembic disepakati."
+	@exit 1
 test:      ## jalankan tes
-	docker compose exec api pytest -q
+	python -m pytest -q
 lint:
-	docker compose exec api ruff check .
+	python -m ruff check .

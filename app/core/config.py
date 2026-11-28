@@ -1,26 +1,29 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).resolve().parents[2] / ".env",
+        extra="ignore",
+    )
 
     APP_NAME: str = "Anterin Dong API"
     APP_ENV: str = "development"
     API_PREFIX: str = "/api/v1"
 
-    DATABASE_URL: str = "postgresql+psycopg2://anterin:anterin@db:5432/anterin_dong"
+    DATABASE_URL: str = "postgresql+psycopg2://anterin:anterin@localhost:5432/anterin_dong"
 
     JWT_SECRET: str = ""
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    # MVP tanpa refresh token, jadi access token berlaku 8 jam.
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
 
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
 
-    GOOGLE_CLIENT_ID: str = ""
     ALLOWED_EMAIL_DOMAIN: str = "mail.ugm.ac.id"
 
     @model_validator(mode="after")
