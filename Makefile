@@ -1,9 +1,11 @@
 run:       ## jalankan API lokal
 	python -m uvicorn app.main:app --reload
-migrate:   ## terapkan migrasi
-	python -m alembic upgrade head
-revision:  ## buat migrasi baru: make revision m="tambah tabel users"
-	python -m alembic revision --autogenerate -m "$(m)"
+migrate:   ## ditahan sampai riwayat Alembic diselaraskan dengan schema.sql
+	@echo "Alembic belum di-baseline dengan schema.sql; upgrade dibatalkan."
+	@exit 1
+revision:  ## ditahan sampai riwayat Alembic diselaraskan dengan schema.sql
+	@echo "Jangan autogenerate migration sebelum baseline Alembic disepakati."
+	@exit 1
 test:      ## jalankan tes
 	python -m pytest -q
 lint:
