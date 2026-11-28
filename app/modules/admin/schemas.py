@@ -1,7 +1,7 @@
 """Schema Pydantic modul admin — Master API Reference v1.3."""
 
 from typing import Literal
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class AdminOrderItem(BaseModel):
@@ -72,10 +72,30 @@ class AdminLocationCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=150)
     description: str | None = None
 
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        value = value.strip()
+        if not value:
+            raise ValueError("Nama lokasi tidak boleh kosong.")
+        return value
+
 
 class AdminLocationUpdateRequest(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=150)
     description: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        value = value.strip()
+        if not value:
+            raise ValueError("Nama lokasi tidak boleh kosong.")
+        return value
 
 
 class AdminLocationMutationResponse(BaseModel):

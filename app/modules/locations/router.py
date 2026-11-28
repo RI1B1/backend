@@ -1,7 +1,7 @@
 """Endpoint Locations sesuai Master API Reference v1.3 bagian 6.
 
 Respons "polos" (tanpa pembungkus {success, data}), sama seperti modul auth dan orders.
-Endpoint Admin lokasi (bagian 11.5-11.8) belum dibuat: menunggu keputusan tim.
+Endpoint Admin lokasi (bagian 11.5-11.8) ada di modul admin (admin/router.py).
 """
 
 from fastapi import APIRouter, Depends
